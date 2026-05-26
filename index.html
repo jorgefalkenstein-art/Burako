@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Burako">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111111">
+<title>Burako</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #111; color: #fff; min-height: 100dvh; max-width: 480px; margin: 0 auto; padding: 16px 12px 60px; }
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:100; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:#1e1e1e; border-radius:20px; padding:28px 24px; width:calc(100% - 48px); max-width:340px; text-align:center; }
+  .modal h2 { font-size:20px; font-weight:800; margin-bottom:10px; }
+  .modal p { color:#aaa; font-size:14px; margin-bottom:24px; line-height:1.5; }
+  .modal-btns { display:flex; gap:10px; }
+  .modal-btns button { flex:1; border:none; border-radius:12px; font-size:16px; font-weight:700; padding:14px; cursor:pointer; }
+  .btn-cancel { background:#2a2a2a; color:#fff; }
+  .btn-confirm { background:#e63946; color:#fff; }
+  #winner-banner { display:none; background:linear-gradient(135deg,#f4a261,#e63946); color:#111; text-align:center; padding:14px; border-radius:14px; margin-bottom:14px; font-weight:800; font-size:20px; }
+  .goal-setting { text-align:center; margin-bottom:14px; }
+  .goal-setting label { font-size:12px; color:#555; }
+  .goal-setting input { background:#1e1e1e; border:1px solid #333; border-radius:8px; color:#fff; font-size:14px; padding:4px 10px; text-align:center; outline:none; width:90px; margin-left:6px; }
+  .teams { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .team-card { background:#1e1e1e; border-radius:16px; padding:14px; border:2px solid var(--c); }
+  .team-card:first-child { --c:#e63946; }
+  .team-card:last-child  { --c:#457b9d; }
+  .team-name-wrap { display:flex; align-items:center; gap:4px; margin-bottom:6px; }
+  .team-name { font-size:12px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:1px; border:none; background:transparent; width:100%; outline:none; -webkit-user-select:text; user-select:text; }
+  .score { font-size:54px; font-weight:900; line-height:1; color:var(--c); }
+  .goal-label { font-size:11px; color:#555; margin-bottom:8px; }
+  .bar-wrap { height:6px; background:#2a2a2a; border-radius:3px; margin-bottom:12px; }
+  .bar { height:6px; background:var(--c); border-radius:3px; transition:width .4s; }
+  .pts-input { width:100%; background:#2a2a2a; border:1px solid #333; border-radius:10px; color:#fff; font-size:22px; font-weight:700; padding:10px; text-align:center; outline:none; margin-bottom:8px; -webkit-user-select:text; user-select:text; }
+  .pts-input::placeholder { color:#444; font-size:16px; }
+  .sum-btn { width:100%; background:var(--c); border:none; border-radius:10px; color:#fff; font-size:17px; font-weight:800; padding:13px; cursor:pointer; }
+  .diff-row { text-align:center; color:#888; font-size:13px; margin-bottom:12px; min-height:20px; }
+  .diff-row strong { color:#fff; }
+  .actions { display:flex; gap:10px; margin-bottom:16px; }
+  .btn-undo  { flex:1; background:#1e1e1e; border:1px solid #444; border-radius:10px; color:#fff; font-size:15px; font-weight:700; padding:13px; cursor:pointer; }
+  .btn-undo:disabled { color:#333; border-color:#222; cursor:default; }
+  .btn-reset { flex:1; background:#1e1e1e; border:1px solid #e63946; border-radius:10px; color:#e63946; font-size:15px; font-weight:700; padding:13px; cursor:pointer; }
+  .btn-share { flex:1; background:#1e1e1e; border:1px solid #2ea043; border-radius:10px; color:#2ea043; font-size:15px; font-weight:700; padding:13px; cursor:pointer; }
+  .history-box { background:#1e1e1e; border-radius:12px; padding:12px; display:none; }
+  .hist-title { font-size:11px; font-weight:800; letter-spacing:2px; color:#555; text-transform:uppercase; margin-bottom:8px; }
+  .hist-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #2a2a2a; font-size:14px; }
+  .hist-row:last-child { border-bottom:none; }
+  .hist-prev { color:#555; font-size:12px; }
+</style>
+</head>
+<body>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>⚠️ Reiniciar partida</h2>
+    <p>Se borrarán todos los puntos y el historial. Esta acción no se puede deshacer.</p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarReinicio()">Sí, reiniciar</button>
+    </div>
+  </div>
+</div>
+
+<div id="winner-banner">🏆 ¡<span id="winner-name"></span> ganó la partida!</div>
+
+<div class="goal-setting">
+  <label>Meta: <input type="number" id="goal-input" value="3000" min="100" step="100" onchange="updateGoal()"> pts</label>
+</div>
+
+<div class="teams">
+  <div class="team-card">
+    <div class="team-name-wrap">
+      <input class="team-name" id="name0" value="Equipo 1" placeholder="Equipo 1">
+      <span style="font-size:11px;color:#555;">✏️</span>
+    </div>
+    <div class="score" id="score0">0</div>
+    <div class="goal-label" id="label0">de 3000</div>
+    <div class="bar-wrap"><div class="bar" id="bar0" style="width:0%"></div></div>
+    <input class="pts-input" id="input0" type="number" inputmode="numeric" placeholder="Puntos..." onkeydown="if(event.key==='Enter'){sumar(0)}">
+    <button class="sum-btn" onclick="sumar(0)">+ Sumar</button>
+  </div>
+  <div class="team-card">
+    <div class="team-name-wrap">
+      <input class="team-name" id="name1" value="Equipo 2" placeholder="Equipo 2">
+      <span style="font-size:11px;color:#555;">✏️</span>
+    </div>
+    <div class="score" id="score1">0</div>
+    <div class="goal-label" id="label1">de 3000</div>
+    <div class="bar-wrap"><div class="bar" id="bar1" style="width:0%"></div></div>
+    <input class="pts-input" id="input1" type="number" inputmode="numeric" placeholder="Puntos..." onkeydown="if(event.key==='Enter'){sumar(1)}">
+    <button class="sum-btn" onclick="sumar(1)">+ Sumar</button>
+  </div>
+</div>
+
+<div class="diff-row" id="diff-row"></div>
+
+<div class="actions">
+  <button class="btn-undo" id="btn-undo" onclick="deshacer()" disabled>↩ Deshacer</button>
+  <button class="btn-reset" onclick="pedirReinicio()">🔄 Reiniciar</button>
+  <button class="btn-share" onclick="compartir()">📤 Compartir</button>
+</div>
+
+<div class="history-box" id="history-box">
+  <div class="hist-title">Historial</div>
+  <div id="history-list"></div>
+</div>
+
+<script>
+  let scores = [0, 0];
+  let goal = 3000;
+  let history = [];
+
+  function updateGoal() {
+    goal = parseInt(document.getElementById('goal-input').value) || 3000;
+    render();
+  }
+
+  function sumar(i) {
+    const inp = document.getElementById('input' + i);
+    const pts = parseInt(inp.value);
+    if (isNaN(pts) || pts === 0) { inp.focus(); return; }
+    history.push({ scores: [...scores], pts, team: i });
+    scores[i] += pts;
+    inp.value = '';
+    render();
+  }
+
+  function deshacer() {
+    if (!history.length) return;
+    const last = history.pop();
+    scores = [...last.scores];
+    render();
+  }
+
+  function pedirReinicio() {
+    document.getElementById('modal').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+  function confirmarReinicio() {
+    scores = [0, 0];
+    history = [];
+    closeModal();
+    render();
+  }
+
+  function compartir() {
+    const n0 = document.getElementById('name0').value || 'Equipo 1';
+    const n1 = document.getElementById('name1').value || 'Equipo 2';
+    const w = scores.findIndex(s => s >= goal);
+    let txt = '🃏 BURAKO\n';
+    txt += n0 + ': ' + scores[0] + ' pts\n';
+    txt += n1 + ': ' + scores[1] + ' pts\n';
+    if (w >= 0) {
+      txt += '\n🏆 ¡Ganó ' + (w === 0 ? n0 : n1) + '!';
+    } else {
+      const leader = scores[0] > scores[1] ? 0 : scores[1] > scores[0] ? 1 : -1;
+      if (leader >= 0) txt += '\nLidera ' + (leader === 0 ? n0 : n1) + ' por ' + Math.abs(scores[0] - scores[1]) + ' pts';
+    }
+    txt += '\nMeta: ' + goal + ' pts';
+    if (navigator.share) {
+      navigator.share({ title: 'Burako', text: txt });
+    } else {
+      navigator.clipboard.writeText(txt).then(() => alert('¡Copiado al portapapeles!'));
+    }
+  }
+
+  function render() {
+    for (let i = 0; i < 2; i++) {
+      document.getElementById('score' + i).textContent = scores[i];
+      const pct = Math.min(100, (scores[i] / goal) * 100);
+      document.getElementById('bar' + i).style.width = pct + '%';
+      document.getElementById('label' + i).textContent = 'de ' + goal;
+    }
+    const w = scores.findIndex(s => s >= goal);
+    const banner = document.getElementById('winner-banner');
+    if (w >= 0) {
+      document.getElementById('winner-name').textContent = document.getElementById('name' + w).value || ('Equipo ' + (w + 1));
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
+    const diffRow = document.getElementById('diff-row');
+    if (scores[0] !== scores[1]) {
+      const leader = scores[0] > scores[1] ? 0 : 1;
+      const n = document.getElementById('name' + leader).value || ('Equipo ' + (leader + 1));
+      diffRow.innerHTML = n + ' gana por <strong>' + Math.abs(scores[0] - scores[1]) + ' pts</strong>';
+    } else {
+      diffRow.textContent = '';
+    }
+    document.getElementById('btn-undo').disabled = history.length === 0;
+    const box = document.getElementById('history-box');
+    const list = document.getElementById('history-list');
+    if (!history.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    list.innerHTML = [...history].reverse().map(h => {
+      const n = document.getElementById('name' + h.team).value || ('Equipo ' + (h.team + 1));
+      const color = h.team === 0 ? '#e63946' : '#457b9d';
+      return '<div class="hist-row"><span style="color:' + color + ';font-weight:700">' + n + ': ' + (h.pts > 0 ? '+' : '') + h.pts + '</span><span class="hist-prev">' + h.scores[0] + ' / ' + h.scores[1] + '</span></div>';
+    }).join('');
+  }
+
+  render();
+</script>
+</body>
+</html>
